@@ -1,7 +1,6 @@
 import torch
 import os
 os.environ["WANDB_DISABLED"] = "true"
-import wandb
 import random
 from tqdm import tqdm
 import warnings
@@ -44,13 +43,6 @@ def train_rddm(config):
     alpha1 = config["alpha1"]
     alpha2 = config["alpha2"]
     PATH = config["PATH"]
-
-    wandb.init(
-        project="INSERT PROJECT NAME HERE",
-        entity="INSERT ENTITY HERE",
-        id=f"INSERT ID HERE",
-        config=config
-    )
 
     dataset_train, _ = get_datasets()
 
@@ -105,11 +97,7 @@ def train_rddm(config):
             optim.step()
 
             pbar.set_description(f"loss: {loss.mean().item():.4f}")
-
-            wandb.log({
-                "DDPM_loss": ddpm_loss.mean().item(),
-                "Region_loss": region_loss.mean().item(),
-            })
+            pbar.set_postfix(DDPM=ddpm_loss.mean().item(), Region=region_loss.mean().item())
 
         scheduler.step()
 
