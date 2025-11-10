@@ -111,7 +111,7 @@ if __name__ == "__main__":
 
     config = {
         "n_epoch": 5,#1000,
-        "batch_size": 16,#128*4,
+        "batch_size": 32,#128*4,
         "nT":10,
         "device": "cuda",
         "attention_heads": 8,
