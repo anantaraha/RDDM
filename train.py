@@ -52,7 +52,7 @@ def train_rddm(config):
 
     dataset_train, _ = get_datasets()
 
-    dataloader = DataLoader(dataset_train, batch_size=batch_size, shuffle=True, num_workers=128)
+    dataloader = DataLoader(dataset_train, batch_size=batch_size, shuffle=True, num_workers=8)
 
     rddm = RDDM(
         eps_model=DiffusionUNetCrossAttention(512, 1, device, num_heads=num_heads),
@@ -88,8 +88,8 @@ def train_rddm(config):
             y_ecg = y_ecg.float().to(device)
             ecg_roi = ecg_roi.float().to(device)
 
-            ppg_conditions1 = Conditioning_network1(x_ppg, drop_prob=cond_mask)
-            ppg_conditions2 = Conditioning_network2(x_ppg, drop_prob=cond_mask)
+            ppg_conditions1 = Conditioning_network1(x_ppg)
+            ppg_conditions2 = Conditioning_network2(x_ppg)
 
             ddpm_loss, region_loss = rddm(x=y_ecg, cond1=ppg_conditions1, cond2=ppg_conditions2, patch_labels=ecg_roi)
 
