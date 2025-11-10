@@ -128,7 +128,7 @@ if __name__ == "__main__":
         "cond_mask": 0.0,
         "alpha1": 100,
         "alpha2": 1,
-        "PATH": "INSERT PATH HERE"
+        "PATH": ".."
     }
 
     train_rddm(config)

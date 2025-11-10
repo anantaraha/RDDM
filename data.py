@@ -4,6 +4,7 @@ from tqdm import tqdm
 import neurokit2 as nk
 import sklearn.preprocessing as skp
 from torch.utils.data import Dataset, DataLoader
+from config import DATA_ROOT, DATASETS
 
 class ECGDataset(Dataset):
     def __init__(self, ecg_data, ppg_data):
@@ -37,9 +38,9 @@ class ECGDataset(Dataset):
         return len(self.ecg_data)
 
 def get_datasets(
-    DATA_PATH = "../../ingenuity_NAS/21ds94_nas/21ds94_mount/AAAI24/datasets/", 
-    datasets=["BIDMC", "CAPNO", "DALIA", "MIMIC-AFib", "WESAD"],
-    window_size=4,
+    data_root=DATA_ROOT, 
+    datasets=DATASETS,
+    window=4,
     ):
 
     ecg_train_list = []
@@ -49,11 +50,11 @@ def get_datasets(
     
     for dataset in datasets:
 
-        ecg_train = np.load(DATA_PATH + dataset + f"/ecg_train_{window_size}sec.npy", allow_pickle=True).reshape(-1, 128*window_size)
-        ppg_train = np.load(DATA_PATH + dataset + f"/ppg_train_{window_size}sec.npy", allow_pickle=True).reshape(-1, 128*window_size)
+        ecg_train = np.load(data_root + dataset + f"/ecg_train_{window}sec.npy", allow_pickle=True).reshape(-1, 128*window_size)
+        ppg_train = np.load(data_root + dataset + f"/ppg_train_{window}sec.npy", allow_pickle=True).reshape(-1, 128*window_size)
         
-        ecg_test = np.load(DATA_PATH + dataset + f"/ecg_test_{window_size}sec.npy", allow_pickle=True).reshape(-1, 128*window_size)
-        ppg_test = np.load(DATA_PATH + dataset + f"/ppg_test_{window_size}sec.npy", allow_pickle=True).reshape(-1, 128*window_size)
+        ecg_test = np.load(data_root + dataset + f"/ecg_test_{window}sec.npy", allow_pickle=True).reshape(-1, 128*window_size)
+        ppg_test = np.load(data_root + dataset + f"/ppg_test_{window}sec.npy", allow_pickle=True).reshape(-1, 128*window_size)
 
         ecg_train_list.append(ecg_train)
         ppg_train_list.append(ppg_train)

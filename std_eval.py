@@ -12,6 +12,7 @@ import torch.nn.functional as F
 from data import get_datasets
 import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader
+from config import WEIGHTS_DIR
 
 def set_deterministic(seed):
     # seed by default is None 
@@ -43,7 +44,7 @@ def pad_along_axis(array: np.ndarray, target_length: int, axis: int = 0) -> np.n
 
     return np.pad(array, pad_width=npad, mode='constant', constant_values=0)
 
-def eval_diffusion(window_size, EVAL_DATASETS, nT=10, batch_size=512, PATH="../../ingenuity_NAS/21ds94_nas/21ds94_mount/AAAI24/public_checkpoints/", device="cuda"):
+def eval_diffusion(window_size, EVAL_DATASETS, nT=10, batch_size=512, PATH=WEIGHTS_DIR, device="cuda"):
 
     _, dataset_test = get_datasets(datasets=EVAL_DATASETS, window_size=window_size)
 
