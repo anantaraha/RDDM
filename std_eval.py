@@ -44,9 +44,9 @@ def pad_along_axis(array: np.ndarray, target_length: int, axis: int = 0) -> np.n
 
     return np.pad(array, pad_width=npad, mode='constant', constant_values=0)
 
-def eval_diffusion(window_size, EVAL_DATASETS, nT=10, batch_size=512, PATH=WEIGHTS_DIR, device="cuda"):
+def eval_diffusion(window, EVAL_DATASETS, nT=10, batch_size=512, PATH=WEIGHTS_DIR, device="cuda"):
 
-    _, dataset_test = get_datasets(datasets=EVAL_DATASETS, window_size=window_size)
+    _, dataset_test = get_datasets(datasets=EVAL_DATASETS, window=window)
 
     testloader = DataLoader(dataset_test, batch_size=batch_size, shuffle=True, num_workers=64)
 
@@ -68,10 +68,10 @@ def eval_diffusion(window_size, EVAL_DATASETS, nT=10, batch_size=512, PATH=WEIGH
     with torch.no_grad():
 
         fd_list = []
-        fake_ecgs = np.zeros((1, 128*window_size))
-        real_ecgs = np.zeros((1, 128*window_size))
-        real_ppgs = np.zeros((1, 128*window_size))
-        true_rois = np.zeros((1, 128*window_size))
+        fake_ecgs = np.zeros((1, 128*window))
+        real_ecgs = np.zeros((1, 128*window))
+        real_ppgs = np.zeros((1, 128*window))
+        true_rois = np.zeros((1, 128*window))
 
         for y_ecg, x_ppg, ecg_roi in tqdm(testloader):
 
@@ -99,14 +99,14 @@ def eval_diffusion(window_size, EVAL_DATASETS, nT=10, batch_size=512, PATH=WEIGH
                 
                 generated_windows.append(xh.cpu().numpy())
 
-            xh = np.concatenate(generated_windows, axis=-1)[:, :, :128*window_size]
+            xh = np.concatenate(generated_windows, axis=-1)[:, :, :128*window]
 
             fd = calculate_FD(y_ecg, torch.from_numpy(xh).to(device))
 
-            fake_ecgs = np.concatenate((fake_ecgs, xh.reshape(-1, 128*window_size)))
-            real_ecgs = np.concatenate((real_ecgs, y_ecg.reshape(-1, 128*window_size).cpu().numpy()))
-            real_ppgs = np.concatenate((real_ppgs, x_ppg.reshape(-1, 128*window_size).cpu().numpy()))
-            true_rois = np.concatenate((true_rois, ecg_roi.reshape(-1, 128*window_size).cpu().numpy()))
+            fake_ecgs = np.concatenate((fake_ecgs, xh.reshape(-1, 128*window)))
+            real_ecgs = np.concatenate((real_ecgs, y_ecg.reshape(-1, 128*window).cpu().numpy()))
+            real_ppgs = np.concatenate((real_ppgs, x_ppg.reshape(-1, 128*window).cpu().numpy()))
+            true_rois = np.concatenate((true_rois, ecg_roi.reshape(-1, 128*window).cpu().numpy()))
             fd_list.append(fd)
 
         mae_hr_ecg, rmse_score = evaluation_pipeline(real_ecgs[1:], fake_ecgs[1:])
@@ -134,7 +134,7 @@ if __name__ == "__main__":
     for dataset_name in ["WESAD", "CAPNO", "DALIA", "BIDMC", "MIMIC-AFib"]:
         
         tracked_metrics = eval_diffusion(
-            window_size=4,
+            window=4,
             EVAL_DATASETS=[dataset_name],
             nT=10,
         )
@@ -146,7 +146,7 @@ if __name__ == "__main__":
     for dataset_name in ["WESAD", "DALIA"]:
         
         tracked_metrics = eval_diffusion(
-            window_size=8,
+            window=8,
             EVAL_DATASETS=[dataset_name],
             nT=10,
         )
