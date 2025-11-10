@@ -1,4 +1,6 @@
 import torch
+import os
+os.environ["WANDB_DISABLED"] = "true"
 import wandb
 import random
 from tqdm import tqdm
