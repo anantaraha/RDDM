@@ -110,11 +110,11 @@ def train_rddm(config):
 if __name__ == "__main__":
 
     config = {
-        "n_epoch": 20,#1000,
+        "n_epoch": 5,#1000,
         "batch_size": 8,#128*4,
         "nT":10,
         "device": "cuda",
-        "attention_heads": 4,#8,
+        "attention_heads": 8,
         "cond_mask": 0.0,
         "alpha1": 100,
         "alpha2": 1,
