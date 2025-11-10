@@ -50,11 +50,11 @@ def get_datasets(
     
     for dataset in datasets:
 
-        ecg_train = np.load(data_root + dataset + f"/ecg_train_{window}sec.npy", allow_pickle=True).reshape(-1, 128*window_size)
-        ppg_train = np.load(data_root + dataset + f"/ppg_train_{window}sec.npy", allow_pickle=True).reshape(-1, 128*window_size)
+        ecg_train = np.load(data_root + dataset + f"/ecg_train_{window}sec.npy", allow_pickle=True).reshape(-1, 128*window)
+        ppg_train = np.load(data_root + dataset + f"/ppg_train_{window}sec.npy", allow_pickle=True).reshape(-1, 128*window)
         
-        ecg_test = np.load(data_root + dataset + f"/ecg_test_{window}sec.npy", allow_pickle=True).reshape(-1, 128*window_size)
-        ppg_test = np.load(data_root + dataset + f"/ppg_test_{window}sec.npy", allow_pickle=True).reshape(-1, 128*window_size)
+        ecg_test = np.load(data_root + dataset + f"/ecg_test_{window}sec.npy", allow_pickle=True).reshape(-1, 128*window)
+        ppg_test = np.load(data_root + dataset + f"/ppg_test_{window}sec.npy", allow_pickle=True).reshape(-1, 128*window)
 
         ecg_train_list.append(ecg_train)
         ppg_train_list.append(ppg_train)
