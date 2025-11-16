@@ -7,12 +7,14 @@ import warnings
 warnings.filterwarnings("ignore")
 import numpy as np
 from model import DiffusionUNetCrossAttention, ConditionNet
-from diffusion import RDDM
+from diffusion import RDDM, NaiveDDPM
 from data import get_datasets
 import torch.nn as nn
 from metrics import *
 from lr_scheduler import CosineAnnealingLRWarmup
 from torch.utils.data import Dataset, DataLoader
+from config import RDDM_TRAIN_CONFIG, DDPM_TRAIN_CONFIG, SAVE_AFTER_EPOCHS
+import sys
 
 def set_deterministic(seed):
     # seed by default is None 
@@ -101,24 +103,79 @@ def train_rddm(config):
 
         scheduler.step()
 
-        if i % 80 == 0:
+        if i % SAVE_AFTER_EPOCHS == 0:
             torch.save(rddm.module.state_dict(), f"{PATH}/RDDM_epoch{i}.pth")
             torch.save(Conditioning_network1.module.state_dict(), f"{PATH}/ConditionNet1_epoch{i}.pth")
             torch.save(Conditioning_network2.module.state_dict(), f"{PATH}/ConditionNet2_epoch{i}.pth")
 
+def train_ddpm(config):
+
+    n_epoch = config["n_epoch"]
+    device = config["device"]
+    batch_size = config["batch_size"]
+    nT = config["nT"]
+    num_heads = config["attention_heads"]
+    PATH = config["PATH"]
+
+    dataset_train, _ = get_datasets()
+
+    dataloader = DataLoader(dataset_train, batch_size=batch_size, shuffle=True, num_workers=8)
+
+    ddpm = NaiveDDPM(
+        eps_model=DiffusionUNetCrossAttention(512, 1, device, num_heads=num_heads),
+        betas=(1e-4, 0.2), 
+        n_T=nT
+    ).to(device)
+
+    Conditioning_network = ConditionNet().to(device)
+
+    optim = torch.optim.AdamW([*ddpm.parameters(), *Conditioning_network.parameters()], lr=1e-4)
+
+    ddpm = nn.DataParallel(ddpm)
+    Conditioning_network = nn.DataParallel(Conditioning_network)
+
+    scheduler = CosineAnnealingLRWarmup(optim, T_max=1000, T_warmup=20)
+    for i in range(n_epoch):
+        print(f"\n****************** Epoch - {i} *******************\n\n")
+
+        ddpm.train()
+        Conditioning_network.train()
+        pbar = tqdm(dataloader)
+
+        for y_ecg, x_ppg, _ in pbar:
+            
+            ## Train Diffusion
+            optim.zero_grad()
+            x_ppg = x_ppg.float().to(device)
+            y_ecg = y_ecg.float().to(device)
+
+            ppg_conditions1 = Conditioning_network(x_ppg)
+
+            loss = ddpm(x=y_ecg, cond=ppg_conditions1)
+
+            loss.mean().backward()
+            
+            optim.step()
+
+            pbar.set_description(f"loss: {loss.mean().item():.4f}")
+            pbar.set_postfix(DDPM=loss.mean().item())
+
+        scheduler.step()
+
+        if i % SAVE_AFTER_EPOCHS == 0:
+            torch.save(ddpm.module.state_dict(), f"{PATH}/DDPM_epoch{i}.pth")
+            torch.save(Conditioning_network.module.state_dict(), f"{PATH}/ConditionNet_epoch{i}.pth")
                 
 if __name__ == "__main__":
 
-    config = {
-        "n_epoch": 5,#1000,
-        "batch_size": 64,#128*4,
-        "nT":10,
-        "device": "cuda",
-        "attention_heads": 8,
-        "cond_mask": 0.0,
-        "alpha1": 100,
-        "alpha2": 1,
-        "PATH": "../"
-    }
-
-    train_rddm(config)
+    if len(sys.argv) > 1: # Argument supplied
+        cmd = sys.argv[1].lower()
+        if cmd == 'ddpm':
+            train_ddpm(DDPM_TRAIN_CONFIG)
+        elif cmd == 'rddm':
+            train_rddm(RDDM_TRAIN_CONFIG)
+        else:
+            print('Unrecognized command!! No operation.')
+    else:   # By default, train both
+        train_rddm(RDDM_TRAIN_CONFIG)
+        train_ddpm(DDPM_TRAIN_CONFIG)

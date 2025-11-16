@@ -2,6 +2,7 @@ import os, pickle, mat73, numpy as np
 from scipy.signal import butter, filtfilt, resample_poly
 from zipfile import ZipFile
 from scipy.io import loadmat
+from config import DATA_ROOT
 
 def _resamp(x, fs_src, fs_tgt=128):
     fs_src = int(float(np.asarray(fs_src)))
@@ -163,6 +164,8 @@ def unzip_single_file(zip_path, extract_path, file_path):
 
 if __name__ == "__main__":
 
+    #=============>> WESAD <<=============
+    #=============>> WESAD <<=============
     print('WESAD (Expects wesad.zip in current directory): https://uni-siegen.sciebo.de/s/HGdUkoNlW1Ub0Gx/download/WESAD.zip')
     print('-'*80)
     # list .pkl paths inside the zip
@@ -175,19 +178,21 @@ if __name__ == "__main__":
                 wesad_pkl_paths.append(name)
 
     # WESAD Dataset: 4s window
-    build_splits_from_pickles(zip_path='wesad.zip', pkl_paths=wesad_pkl_paths, out='../datasets/WESAD/',
+    build_splits_from_pickles(zip_path='wesad.zip', pkl_paths=wesad_pkl_paths, out=os.path.join(DATA_ROOT, 'WESAD/'),
                         ecg_raw_fn=lambda x:np.asanyarray(x['signal']['chest']['ECG']).squeeze(), 
                         ppg_raw_fn=lambda x:np.asanyarray(x['signal']['wrist']['BVP']).squeeze(),
                         win_sec=4, stride_sec=None, ecg_fs_src=700, ppg_fs_src=64, fs_tgt=128,
                         train_ratio=0.8, seed=128)
 
     # WESAD Dataset: 8s window
-    build_splits_from_pickles(zip_path='wesad.zip', pkl_paths=wesad_pkl_paths, out='../datasets/WESAD/',
+    build_splits_from_pickles(zip_path='wesad.zip', pkl_paths=wesad_pkl_paths, out=os.path.join(DATA_ROOT, 'WESAD/'),
                         ecg_raw_fn=lambda x:np.asanyarray(x['signal']['chest']['ECG']).squeeze(), 
                         ppg_raw_fn=lambda x:np.asanyarray(x['signal']['wrist']['BVP']).squeeze(),
                         win_sec=8, stride_sec=None, ecg_fs_src=700, ppg_fs_src=64, fs_tgt=128,
                         train_ratio=0.8, seed=128)
 
+    #=============>> CAPNO <<=============
+    #=============>> CAPNO <<=============
     print('CAPNO (Expects capno.zip in current directory): https://drive.google.com/uc?id=1HWTAWT1phMQYZlnKJ160FnEPAaRECbk2')
     print('-'*80)
     capno_m_paths = []
@@ -199,7 +204,7 @@ if __name__ == "__main__":
                 capno_m_paths.append(name)
     
     # CAPNO Dataset
-    build_splits_from_mat(zip_path='capno.zip', mat_paths=capno_m_paths, out='../datasets/CAPNO/',
+    build_splits_from_mat(zip_path='capno.zip', mat_paths=capno_m_paths, out=os.path.join(DATA_ROOT, 'CAPNO/'),
                         ecg_raw_fn=lambda x:np.asarray(x['signal']['ecg']['y']).squeeze().astype(np.float32),
                         ppg_raw_fn=lambda x:np.asarray(x['signal']['pleth']['y']).squeeze().astype(np.float32),
                         win_sec=4, stride_sec=None,
@@ -207,6 +212,8 @@ if __name__ == "__main__":
                         ppg_fs_src_fn=lambda x:np.asarray(x['param']['samplingrate']['pleth']).squeeze(),
                         fs_tgt=128, train_ratio=0.8, seed=128)
 
+    #=============>> DALIA <<=============
+    #=============>> DALIA <<=============
     print('DALIA (Expects dalia.zip in current directory): https://uni-siegen.sciebo.de/s/pfHzlTepXkiJ4jP/download/PPG_FieldStudy.zip')
     print('-'*80)
     dalia_pkl_paths = []
@@ -218,19 +225,21 @@ if __name__ == "__main__":
                 dalia_pkl_paths.append(name)
 
     # DALIA Dataset: 4s window
-    build_splits_from_pickles(zip_path='dalia.zip', pkl_paths=dalia_pkl_paths, out='../datasets/DALIA/',
+    build_splits_from_pickles(zip_path='dalia.zip', pkl_paths=dalia_pkl_paths, out=os.path.join(DATA_ROOT, 'DALIA/'),
                         ecg_raw_fn=lambda x:np.asanyarray(x['signal']['chest']['ECG']).squeeze(), 
                         ppg_raw_fn=lambda x:np.asanyarray(x['signal']['wrist']['BVP']).squeeze(),
                         win_sec=4, stride_sec=None, ecg_fs_src=700, ppg_fs_src=64, fs_tgt=128,
                         train_ratio=0.8, seed=128)
 
     # DALIA Dataset: 8s window
-    build_splits_from_pickles(zip_path='dalia.zip', pkl_paths=dalia_pkl_paths, out='../datasets/DALIA/',
+    build_splits_from_pickles(zip_path='dalia.zip', pkl_paths=dalia_pkl_paths, out=os.path.join(DATA_ROOT, 'DALIA/'),
                         ecg_raw_fn=lambda x:np.asanyarray(x['signal']['chest']['ECG']).squeeze(), 
                         ppg_raw_fn=lambda x:np.asanyarray(x['signal']['wrist']['BVP']).squeeze(),
                         win_sec=8, stride_sec=None, ecg_fs_src=700, ppg_fs_src=64, fs_tgt=128,
                         train_ratio=0.8, seed=128)
 
+    #=============>> BIDMC <<=============
+    #=============>> BIDMC <<=============
     print('BIDMC (Expects bidmc.zip in current directory): https://physionet.org/content/bidmc/get-zip/1.0.0/')
     print('-'*80)
     with ZipFile('bidmc.zip', 'r') as zp:
@@ -240,7 +249,7 @@ if __name__ == "__main__":
     # BIDMC Dataset
     mat_path = "../datasets/BIDMC/bidmc-ppg-and-respiration-dataset-1.0.0/bidmc_data.mat"
     m = loadmat(mat_path, squeeze_me=True, struct_as_record=False)
-    build_splits_from_mat(zip_path=None, mat_paths=m['data'], out='../datasets/BIDMC/',
+    build_splits_from_mat(zip_path=None, mat_paths=m['data'], out=os.path.join(DATA_ROOT, 'BIDMC/'),
                         ecg_raw_fn=lambda x:np.asarray(x.ekg.v).squeeze().astype(np.float32),
                         ppg_raw_fn=lambda x:np.asarray(x.ppg.v).squeeze().astype(np.float32),
                         win_sec=4, stride_sec=None,
@@ -248,13 +257,15 @@ if __name__ == "__main__":
                         ppg_fs_src_fn=lambda x:float(np.asarray(x.ppg.fs).squeeze()),
                         fs_tgt=128, train_ratio=0.8, seed=128)
 
-    print('MIMIC (Expects mimic.zip in current directory): https://zenodo.org/record/6807403/files/mimic_perform_af_data.mat?download=1')
+    #=============>> MIMIC <<=============
+    #=============>> MIMIC <<=============
+    print('MIMIC (Expects mimic.mat in current directory): https://zenodo.org/record/6807403/files/mimic_perform_af_data.mat?download=1')
     print('-'*80)
     
     # MIMIC Dataset
     mat_path = "/kaggle/working/RDDM/mimic.mat"
     m = loadmat(mat_path, squeeze_me=True, struct_as_record=False)
-    build_splits_from_mat(zip_path=None, mat_paths=m['data'], out='../datasets/MIMIC-AFib/',
+    build_splits_from_mat(zip_path=None, mat_paths=m['data'], out=os.path.join(DATA_ROOT, 'MIMIC-AFib/'),
                         ecg_raw_fn=lambda x:np.asarray(x.ekg.v).squeeze().astype(np.float32),
                         ppg_raw_fn=lambda x:np.asarray(x.ppg.v).squeeze().astype(np.float32),
                         win_sec=4, stride_sec=None,
