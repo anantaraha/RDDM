@@ -123,10 +123,10 @@ def eval_afib(
     print_counts("Test fake ECG",  test_ds_fake_ecg)
     # -------------------------------------
 
-    train_loader         = DataLoader(train_ds,           batch_size=batch_size, shuffle=True,  num_workers=4)
-    test_loader_real_ecg = DataLoader(test_ds_real_ecg,   batch_size=batch_size, shuffle=False, num_workers=4)
-    test_loader_real_ppg = DataLoader(test_ds_real_ppg,   batch_size=batch_size, shuffle=False, num_workers=4)
-    test_loader_fake_ecg = DataLoader(test_ds_fake_ecg,   batch_size=batch_size, shuffle=False, num_workers=4)
+    train_loader = DataLoader(train_ds, batch_size=batch_size, shuffle=True, num_workers=4)
+    test_loader_real_ecg = DataLoader(test_ds_real_ecg, batch_size=batch_size, shuffle=False, num_workers=4)
+    test_loader_real_ppg = DataLoader(test_ds_real_ppg, batch_size=batch_size, shuffle=False, num_workers=4)
+    test_loader_fake_ecg = DataLoader(test_ds_fake_ecg, batch_size=batch_size, shuffle=False, num_workers=4)
 
     # VGG-13 model (binary head)
     model = vgg13(weights=None)   # or weights="IMAGENET1K_V1" if you want ImageNet init
@@ -143,11 +143,11 @@ def eval_afib(
         running_loss = 0.0
 
         for X, y in train_loader:
-            X = X.to(device)               # (B, 3, H, W)
-            y = y.to(device).view(-1, 1)   # (B, 1)
+            X = X.to(device)                # (B, 3, H, W)
+            y = y.to(device).view(-1, 1)    # (B, 1)
 
             optimizer.zero_grad()
-            logits = model(X)              # (B, 1)
+            logits = model(X)               # (B, 1)
             loss = criterion(logits, y)
             loss.backward()
             optimizer.step()
@@ -166,12 +166,12 @@ def eval_afib(
     acc_fake_ecg_final,  f1_fake_ecg_final  = eval_loader(test_loader_fake_ecg, model, device)
 
     metrics = {
-        "acc_real_ecg":  acc_real_ecg_final,
-        "f1_real_ecg":   f1_real_ecg_final,
-        "acc_real_ppg":  acc_real_ppg_final,
-        "f1_real_ppg":   f1_real_ppg_final,
-        "acc_fake_ecg":  acc_fake_ecg_final,
-        "f1_fake_ecg":   f1_fake_ecg_final,
+        "acc_real_ecg": acc_real_ecg_final,
+        "f1_real_ecg": f1_real_ecg_final,
+        "acc_real_ppg": acc_real_ppg_final,
+        "f1_real_ppg": f1_real_ppg_final,
+        "acc_fake_ecg": acc_fake_ecg_final,
+        "f1_fake_ecg": f1_fake_ecg_final
     }
     return metrics, model
 
@@ -204,8 +204,8 @@ if __name__ == "__main__":
                                     epochs=25,
                                     lr=1e-4,
                                     device='cuda')
-        print(f"\n{dataset_name} (Real ECG): Accuracy={tracked_metrics['acc_real_ecg_final']}, F1={tracked_metrics['f1_real_ecg_final']}")
-        print(f"{dataset_name} (Real PPG): Accuracy={tracked_metrics['acc_real_ppg_final']}, F1={tracked_metrics['f1_real_ppg_final']}")
-        print(f"{dataset_name} (Fake ECG): Accuracy={tracked_metrics['acc_fake_ecg_final']}, F1={tracked_metrics['f1_fake_ecg_final']}")
+        print(f"\n{dataset_name} (Real ECG): Accuracy={tracked_metrics['acc_real_ecg']}, F1={tracked_metrics['f1_real_ecg']}")
+        print(f"{dataset_name} (Real PPG): Accuracy={tracked_metrics['acc_real_ppg']}, F1={tracked_metrics['f1_real_ppg']}")
+        print(f"{dataset_name} (Fake ECG): Accuracy={tracked_metrics['acc_fake_ecg']}, F1={tracked_metrics['f1_fake_ecg']}")
         print("-"*1000)
 
