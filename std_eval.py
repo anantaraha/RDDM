@@ -133,15 +133,3 @@ if __name__ == "__main__":
         print(f"\n{dataset_name}: RMSE is {tracked_metrics['RMSE_score']}, FD is {tracked_metrics['FD']}")
         print("-"*1000)
 
-    # TABLE 3 results
-    print("\n******* Heart Rate estimation (Table 3) results *******")
-    for dataset_name in ["WESAD", "DALIA"]:
-        
-        tracked_metrics = eval_diffusion(
-            window=8,
-            EVAL_DATASETS=[dataset_name],
-            nT=10,
-        )
-        print(f"\n{dataset_name}: Mean Absolute Error (BPM) is {tracked_metrics['MAE_HR_ECG']}")
-        print("-"*1000)
-

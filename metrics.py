@@ -10,6 +10,7 @@ from biosppy.signals import ecg as ecg_func
 from biosppy.signals import tools as tools
 import neurokit2.ppg as ppg_func
 from torchmetrics.functional import pearson_corrcoef
+from sklearn.metrics import f1_score
 
 def fid_features_to_statistics(features):
     assert torch.is_tensor(features) and features.dim() == 2
@@ -159,6 +160,37 @@ def MAE_hr(real_ecg, fake_ecg, ecg_sampling_freq=128, window_size=4):
     mae_hr_ecg = np.mean(np.absolute(rbpm - fbpm))
 
     return mae_hr_ecg
+
+# Accuracy + F1 function
+def eval_loader(loader, model, device):
+    model.eval()
+    correct, total = 0, 0
+    all_preds, all_targets = [], []
+    with torch.no_grad():
+        for X, y in loader:
+            X = X.to(device)                 # (B, 3, H, W)
+            y = y.to(device).view(-1)        # (B,)
+            logits = model(X).squeeze(1)     # (B,)
+            probs = torch.sigmoid(logits)
+            preds = (probs > 0.5).float()
+
+            correct += (preds == y).sum().item()
+            total   += y.numel()
+
+            all_preds.append(preds.cpu())
+            all_targets.append(y.cpu())
+
+    if total == 0:
+        return 0.0, 0.0
+
+    all_preds   = torch.cat(all_preds).numpy()
+    all_targets = torch.cat(all_targets).numpy()
+
+    acc = correct / total
+    # ensure 0/1 integers for sklearn
+    f1  = f1_score(all_targets.astype(int), all_preds.astype(int), average="binary")
+
+    return acc, f1
 
 def evaluation_pipeline(real_ecg, fake_ecg):
 
