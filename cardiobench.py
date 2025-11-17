@@ -95,6 +95,9 @@ def prep_afib_dataset(window, EVAL_DATASETS, nT=10, batch_size=512, PATH=WEIGHTS
             np.save(os.path.join(save_path, f"afib_{'test' if idx else 'train'}_real_ppgs_{window}sec.npy"),  real_ppgs[1:])
             np.save(os.path.join(save_path, f"afib_{'test' if idx else 'train'}_labels_{window}sec.npy"),  labels[1:])
 
+from sklearn.metrics import f1_score  # if you prefer not to depend on sklearn, we can do it manually
+# or we can compute F1 manually below; I'll do manual F1 to avoid extra deps.
+
 def eval_afib(
     datasets,
     PATH=DATA_ROOT,
@@ -115,6 +118,17 @@ def eval_afib(
         window=window
     )
 
+    # Quick class counts (0, 1)
+    def print_counts(name, ds):
+        y = ds.labels
+        zeros, ones = (y == 0).sum(), (y == 1).sum()
+        print(f"{name}: total={len(y)}, class0={zeros}, class1={ones}")
+    print_counts("Train",          train_ds)
+    print_counts("Test real ECG",  test_ds_real_ecg)
+    print_counts("Test real PPG",  test_ds_real_ppg)
+    print_counts("Test fake ECG",  test_ds_fake_ecg)
+    # -------------------------------------
+
     train_loader         = DataLoader(train_ds,           batch_size=batch_size, shuffle=True,  num_workers=4)
     test_loader_real_ecg = DataLoader(test_ds_real_ecg,   batch_size=batch_size, shuffle=False, num_workers=4)
     test_loader_real_ppg = DataLoader(test_ds_real_ppg,   batch_size=batch_size, shuffle=False, num_workers=4)
@@ -129,18 +143,40 @@ def eval_afib(
     criterion = nn.BCEWithLogitsLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
 
+    # ---- accuracy + F1 for a loader ----
     def eval_loader(loader):
         model.eval()
         correct, total = 0, 0
+        all_preds, all_targets = [], []
         with torch.no_grad():
             for X, y in loader:
-                X = X.to(device)                 # (B, 3, F, T)
+                X = X.to(device)                 # (B, 3, H, W)
                 y = y.to(device).view(-1)        # (B,)
                 logits = model(X).squeeze(1)     # (B,)
-                preds = (torch.sigmoid(logits) > 0.5).float()
+                probs = torch.sigmoid(logits)
+                preds = (probs > 0.5).float()
+
                 correct += (preds == y).sum().item()
                 total   += y.numel()
-        return correct / total if total > 0 else 0.0
+
+                all_preds.append(preds.cpu())
+                all_targets.append(y.cpu())
+
+        acc = correct / total if total > 0 else 0.0
+        if total > 0:
+            all_preds    = torch.cat(all_preds).numpy()
+            all_targets  = torch.cat(all_targets).numpy()
+            # manual F1 (binary)
+            tp = ((all_preds == 1) & (all_targets == 1)).sum()
+            fp = ((all_preds == 1) & (all_targets == 0)).sum()
+            fn = ((all_preds == 0) & (all_targets == 1)).sum()
+            prec = tp / (tp + fp) if (tp + fp) > 0 else 0.0
+            rec  = tp / (tp + fn) if (tp + fn) > 0 else 0.0
+            f1   = 2 * prec * rec / (prec + rec) if (prec + rec) > 0 else 0.0
+        else:
+            f1 = 0.0
+        return acc, f1
+    # ------------------------------------
 
     # train loop
     for epoch in range(epochs):
@@ -148,7 +184,7 @@ def eval_afib(
         running_loss = 0.0
 
         for X, y in train_loader:
-            X = X.to(device)               # (B, 3, F, T)
+            X = X.to(device)               # (B, 3, H, W)
             y = y.to(device).view(-1, 1)   # (B, 1)
 
             optimizer.zero_grad()
@@ -161,20 +197,24 @@ def eval_afib(
         avg_loss = running_loss / len(train_ds)
 
         # validation on real ECG each epoch (upper limit)
-        acc_real_ecg = eval_loader(test_loader_real_ecg)
-        print(f"Epoch {epoch+1}/{epochs} - loss: {avg_loss:.4f} - val_acc (real ecg): {acc_real_ecg:.4f}")
+        acc_real_ecg, f1_real_ecg = eval_loader(test_loader_real_ecg)
+        print(f"Epoch {epoch+1}/{epochs} - loss: {avg_loss:.4f} - "
+              f"val_acc (real ecg): {acc_real_ecg:.4f} - val_f1: {f1_real_ecg:.4f}")
 
     # Final evaluation on all three test sets
-    acc_real_ecg_final = eval_loader(test_loader_real_ecg)
-    acc_real_ppg_final = eval_loader(test_loader_real_ppg)
-    acc_fake_ecg_final = eval_loader(test_loader_fake_ecg)
+    acc_real_ecg_final,  f1_real_ecg_final  = eval_loader(test_loader_real_ecg)
+    acc_real_ppg_final,  f1_real_ppg_final  = eval_loader(test_loader_real_ppg)
+    acc_fake_ecg_final,  f1_fake_ecg_final  = eval_loader(test_loader_fake_ecg)
 
     metrics = {
         "acc_real_ecg":  acc_real_ecg_final,
+        "f1_real_ecg":   f1_real_ecg_final,
         "acc_real_ppg":  acc_real_ppg_final,
+        "f1_real_ppg":   f1_real_ppg_final,
         "acc_fake_ecg":  acc_fake_ecg_final,
+        "f1_fake_ecg":   f1_fake_ecg_final,
     }
-    print("Final AFib accuracies:", metrics)
+    print("Final AFib metrics:", metrics)
 
     return metrics, model
 
