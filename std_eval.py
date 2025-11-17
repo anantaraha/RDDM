@@ -121,16 +121,8 @@ def eval_diffusion(window, EVAL_DATASETS, nT=10, batch_size=512, PATH=WEIGHTS_DI
 
 if __name__ == "__main__":
 
-    config = {
-        "batch_size": 512,
-        "nT": 10,
-        "device": "cuda",
-        "window_size": 4, # Seconds
-        "eval_datasets": ["WESAD"]
-    }
-
-    # TABLE 1 results
-    print("\n******* Standard evaluation (Table 1) results *******")
+    # TABLE 2 results
+    print("\n******* Standard evaluation (Table 2) results *******")
     for dataset_name in ["WESAD", "CAPNO", "DALIA", "BIDMC", "MIMIC-AFib"]:
         
         tracked_metrics = eval_diffusion(
@@ -141,8 +133,8 @@ if __name__ == "__main__":
         print(f"\n{dataset_name}: RMSE is {tracked_metrics['RMSE_score']}, FD is {tracked_metrics['FD']}")
         print("-"*1000)
 
-    # TABLE 2 results
-    print("\n******* Heart Rate estimation (Table 2) results *******")
+    # TABLE 3 results
+    print("\n******* Heart Rate estimation (Table 3) results *******")
     for dataset_name in ["WESAD", "DALIA"]:
         
         tracked_metrics = eval_diffusion(

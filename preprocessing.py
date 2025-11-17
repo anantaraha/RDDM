@@ -1,5 +1,5 @@
 import os, pickle, mat73, numpy as np
-from scipy.signal import butter, filtfilt, resample_poly
+from scipy.signal import butter, filtfilt, resample_poly, stft
 from zipfile import ZipFile
 from scipy.io import loadmat
 from config import DATA_ROOT
@@ -44,7 +44,7 @@ def _win(x, win, stride=None):
     idx = np.arange(win)[None, :] + np.arange(0, n*stride, stride)[:, None]
     return x[idx].astype(np.float32)
 
-def _save_splits(out, tag, ecg_all, ppg_all, train_ratio=0.8, seed=128):
+def _save_splits(out, tag, ecg_all, ppg_all, train_ratio=0.8, seed=128, labels=None):
     idx = np.random.RandomState(seed).permutation(len(ecg_all))
     ntrain = int(len(idx) * train_ratio)
     train, test = idx[:ntrain], idx[ntrain:]
@@ -53,6 +53,10 @@ def _save_splits(out, tag, ecg_all, ppg_all, train_ratio=0.8, seed=128):
     np.save(os.path.join(out, f"ppg_train_{tag}.npy"), ppg_all[train])
     np.save(os.path.join(out, f"ecg_test_{tag}.npy"),  ecg_all[test])
     np.save(os.path.join(out, f"ppg_test_{tag}.npy"),  ppg_all[test])
+    # in case of y
+    if labels is not None:
+        np.save(os.path.join(out, f"labels_train_{tag}.npy"),  labels[train])
+        np.save(os.path.join(out, f"labels_test_{tag}.npy"),  labels[test])
     print("Saved:", [os.path.join(out, f) for f in os.listdir(out) if f.endswith(f"_{tag}.npy")])
 
 def _convert_freq_and_align(ecg_raw, ppg_raw, 
@@ -85,7 +89,7 @@ def build_splits_from_pickles(zip_path, pkl_paths, out,
                  ecg_raw_fn, ppg_raw_fn,
                  win_sec, stride_sec, 
                  ecg_fs_src, ppg_fs_src, fs_tgt,
-                 train_ratio, seed=128):
+                 train_ratio, seed=128, labels=None):
     # Create dir
     os.makedirs(out, exist_ok=True)
     
@@ -111,19 +115,20 @@ def build_splits_from_pickles(zip_path, pkl_paths, out,
     # Stack, save
     ecg_all, ppg_all = np.vstack(ecg_all), np.vstack(ppg_all)
     _save_splits(out, f'{int(win_sec)}sec',
-                 ecg_all, ppg_all, train_ratio, seed)
+                 ecg_all, ppg_all, train_ratio, seed, labels=labels)
 
 def build_splits_from_mat(zip_path, mat_paths, out, # ** If zip_path is None, mat_paths will be considered as list of matlab structures, where each struct denotes one case.
                  ecg_raw_fn, ppg_raw_fn,
                  win_sec, stride_sec, 
                  ecg_fs_src_fn, ppg_fs_src_fn, fs_tgt,
-                 train_ratio, seed=128):
+                 train_ratio, seed=128, labels=None):
     # Create dir
     os.makedirs(out, exist_ok=True)
     
     # Gather pkl files, process and delete
     ecg_all, ppg_all = [], []
-    for mat_path in mat_paths:
+    y_all = [] if labels is not None else None
+    for idx, mat_path in enumerate(mat_paths):
         try:
             if zip_path:
                 # Extract single file
@@ -144,13 +149,19 @@ def build_splits_from_mat(zip_path, mat_paths, out, # ** If zip_path is None, ma
             if ecg_and_ppg:
                 ecg_all.append(ecg_and_ppg[0])
                 ppg_all.append(ecg_and_ppg[1])
+                if labels is not None:
+                    n_win = ecg_raw.shape[0]
+                    y_all.append(np.full(n_win, labels[idx], dtype=np.float32))
         except Exception as e:
             print("skip:", os.path.basename(mat_path), e)
 
     # Stack, save
     ecg_all, ppg_all = np.vstack(ecg_all), np.vstack(ppg_all)
+    y_arr = None
+    if y_all is not None:
+        y_arr = np.concatenate(y_all)   # length == n_windows total
     _save_splits(out, f'{int(win_sec)}sec',
-                 ecg_all, ppg_all, train_ratio, seed)
+                 ecg_all, ppg_all, train_ratio, seed, labels=y_arr)
 
 def unzip_single_file(zip_path, extract_path, file_path):
     with ZipFile(zip_path, 'r') as zip_ref:
@@ -159,6 +170,20 @@ def unzip_single_file(zip_path, extract_path, file_path):
             print(f'Extracted to: {os.path.join(extract_path, file_path)}')
         else:
             print(f'Error!! Unsuccessful: {file_path}')
+
+def _convert_ecg_to_spectrogram_batch(x, fs=128, nperseg=128, noverlap=64):
+    """
+    x: (N, T) array of 1D ECG windows
+    returns: (N, F, T') STFTs
+    """
+    specs = []
+    for sig in x:
+        f, t, Zxx = stft(sig, fs=fs, nperseg=nperseg, noverlap=noverlap)
+        S = np.abs(Zxx).astype(np.float32)
+        S = np.log1p(S)
+        specs.append(S)
+    return np.stack(specs, axis=0)    # (N, F, T')
+
 
 
 
@@ -259,17 +284,23 @@ if __name__ == "__main__":
 
     #=============>> MIMIC <<=============
     #=============>> MIMIC <<=============
-    print('MIMIC (Expects mimic.mat in current directory): https://zenodo.org/record/6807403/files/mimic_perform_af_data.mat?download=1')
+    print('MIMIC (Expects mimic1.mat, mimic2.mat in current directory): https://zenodo.org/record/6807403/files/mimic_perform_af_data.mat?download=1, https://zenodo.org/record/6807403/files/mimic_perform_non_af_data.mat?download=1')
     print('-'*80)
     
     # MIMIC Dataset
-    mat_path = "/kaggle/working/RDDM/mimic.mat"
-    m = loadmat(mat_path, squeeze_me=True, struct_as_record=False)
-    build_splits_from_mat(zip_path=None, mat_paths=m['data'], out=os.path.join(DATA_ROOT, 'MIMIC-AFib/'),
+    m1 = loadmat('mimic1.mat', squeeze_me=True, struct_as_record=False)
+    m2 = loadmat('mimic2.mat', squeeze_me=True, struct_as_record=False)
+
+    data1 = m1['data'].squeeze(); y1 = np.zeros(len(data1))
+    data2 = m2['data'].squeeze(); y2 = np.ones(len(data2))
+
+    data = np.concatenate((data1, data2)); yy = np.concatenate([y1, y2])
+    yy = np.concatenate([y1, y2])
+    build_splits_from_mat(zip_path=None, mat_paths=data, out=os.path.join(DATA_ROOT, 'MIMIC-AFib/'),
                         ecg_raw_fn=lambda x:np.asarray(x.ekg.v).squeeze().astype(np.float32),
                         ppg_raw_fn=lambda x:np.asarray(x.ppg.v).squeeze().astype(np.float32),
                         win_sec=4, stride_sec=None,
                         ecg_fs_src_fn=lambda x:float(np.asarray(x.ekg.fs).squeeze()),
                         ppg_fs_src_fn=lambda x:float(np.asarray(x.ppg.fs).squeeze()),
-                        fs_tgt=128, train_ratio=0.8, seed=128)
+                        fs_tgt=128, train_ratio=0.8, seed=128, labels=yy)
 
