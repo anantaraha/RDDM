@@ -4,6 +4,7 @@ from tqdm import tqdm
 import neurokit2 as nk
 import sklearn.preprocessing as skp
 from torch.utils.data import Dataset, DataLoader
+import torch.nn.functional as F
 from config import DATA_ROOT, DATASETS
 import os
 from preprocessing import _convert_freq_and_align, _convert_ecg_to_spectrogram_batch
@@ -44,21 +45,29 @@ class ECGDataset(Dataset):
         return len(self.ecg_data)
 
 class ECGSpectDataset(Dataset):
-    def __init__(self, specs, labels):
-        self.specs = specs
+    def __init__(self, specs, labels, target_size=(224, 224)):
+        self.specs = specs                  # (N, F, T)
         self.labels = labels.astype(np.float32)
+        self.target_size = target_size      # (H, W) for VGG
 
     def __getitem__(self, idx):
-        s = self.specs[idx]             # (F, T)
+        s = self.specs[idx]                 # (F, T)
+
         # per-sample normalization
         mu, sd = s.mean(), s.std()
         sd = sd if sd > 1e-6 else 1.0
         s = (s - mu) / sd
 
-        # VGG expects 3xHxW -> tile spectrogram to 3 channels
-        s3 = np.stack([s, s, s], axis=0).astype(np.float32) # (3, F, T)
-        y = self.labels[idx]
-        return torch.from_numpy(s3), torch.tensor(y, dtype=torch.float32)
+        # 3-channel spectrogram
+        s3 = np.stack([s, s, s], axis=0).astype(np.float32)   # (3, F, T)
+        x = torch.from_numpy(s3).unsqueeze(0)                 # (1, 3, F, T)
+
+        # resize to 224x224
+        x = F.interpolate(x, size=self.target_size,
+                          mode="bilinear", align_corners=False).squeeze(0)  # (3, H, W)
+
+        y = torch.tensor(self.labels[idx], dtype=torch.float32)
+        return x, y
 
     def __len__(self):
         return len(self.specs)
@@ -70,7 +79,7 @@ def get_datasets(
     window=4,
     ):
     
-    if mode == 'afrib':
+    if mode == 'afib':
         train_x_list = []
         train_y_list = []
         test_x_real_ppg_list = []
@@ -78,12 +87,12 @@ def get_datasets(
         test_x_fake_ecg_list = []
         test_y_list = []
         for dataset in datasets:
-            train_x = np.load(os.path.join(data_root, dataset, f'afrib_train_real_ecgs_{window}sec.npy'))
-            train_y = np.load(os.path.join(data_root, dataset, f'afrib_train_labels_{window}sec.npy'))
-            test_x_fake_ecg = np.load(os.path.join(data_root, dataset, f'afrib_test_fake_ecgs_{window}sec.npy'))
-            test_x_real_ecg = np.load(os.path.join(data_root, dataset, f'afrib_test_real_ecgs_{window}sec.npy'))
-            test_x_real_ppg = np.load(os.path.join(data_root, dataset, f'afrib_test_real_ppgs_{window}sec.npy'))
-            test_y = np.load(os.path.join(data_root, dataset, f'afrib_test_labels_{window}sec.npy'))
+            train_x = np.load(os.path.join(data_root, dataset, f'afib_train_real_ecgs_{window}sec.npy'))
+            train_y = np.load(os.path.join(data_root, dataset, f'afib_train_labels_{window}sec.npy'))
+            test_x_fake_ecg = np.load(os.path.join(data_root, dataset, f'afib_test_fake_ecgs_{window}sec.npy'))
+            test_x_real_ecg = np.load(os.path.join(data_root, dataset, f'afib_test_real_ecgs_{window}sec.npy'))
+            test_x_real_ppg = np.load(os.path.join(data_root, dataset, f'afib_test_real_ppgs_{window}sec.npy'))
+            test_y = np.load(os.path.join(data_root, dataset, f'afib_test_labels_{window}sec.npy'))
 
             train_x_list.append(train_x)
             train_y_list.append(train_y)

@@ -26,7 +26,7 @@ from torch.utils.data import Dataset, DataLoader
 from scipy.signal import stft
 from torchvision.models import vgg13
 
-def prep_afrib_dataset(window, EVAL_DATASETS, nT=10, batch_size=512, PATH=WEIGHTS_DIR, save_path=DATA_ROOT, device="cuda"):
+def prep_afib_dataset(window, EVAL_DATASETS, nT=10, batch_size=512, PATH=WEIGHTS_DIR, save_path=DATA_ROOT, device="cuda"):
 
     dataset_train, dataset_test = get_datasets(mode='ecg+labels', datasets=EVAL_DATASETS, window=window)   ###
 
@@ -90,12 +90,12 @@ def prep_afrib_dataset(window, EVAL_DATASETS, nT=10, batch_size=512, PATH=WEIGHT
                 labels = np.concatenate((labels, label.cpu().numpy()))
             
             #### Here, we save the fake_ecgs, real_ecgs, real_ppgs, labels.
-            np.save(os.path.join(save_path, f"afrib_{'test' if idx else 'train'}_fake_ecgs_{window}sec.npy"),  fake_ecgs[1:])
-            np.save(os.path.join(save_path, f"afrib_{'test' if idx else 'train'}_real_ecgs_{window}sec.npy"),  real_ecgs[1:])
-            np.save(os.path.join(save_path, f"afrib_{'test' if idx else 'train'}_real_ppgs_{window}sec.npy"),  real_ppgs[1:])
-            np.save(os.path.join(save_path, f"afrib_{'test' if idx else 'train'}_labels_{window}sec.npy"),  labels[1:])
+            np.save(os.path.join(save_path, f"afib_{'test' if idx else 'train'}_fake_ecgs_{window}sec.npy"),  fake_ecgs[1:])
+            np.save(os.path.join(save_path, f"afib_{'test' if idx else 'train'}_real_ecgs_{window}sec.npy"),  real_ecgs[1:])
+            np.save(os.path.join(save_path, f"afib_{'test' if idx else 'train'}_real_ppgs_{window}sec.npy"),  real_ppgs[1:])
+            np.save(os.path.join(save_path, f"afib_{'test' if idx else 'train'}_labels_{window}sec.npy"),  labels[1:])
 
-def eval_afrib(
+def eval_afib(
     datasets,
     PATH=DATA_ROOT,
     window=4,
@@ -109,7 +109,7 @@ def eval_afrib(
     
     # Load datasets: STFT-based spectrogram datasets
     train_ds, test_ds_real_ecg, test_ds_real_ppg, test_ds_fake_ecg = get_datasets(
-        mode='afrib',
+        mode='afib',
         data_root=PATH,
         datasets=datasets,
         window=window
