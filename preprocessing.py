@@ -150,7 +150,7 @@ def build_splits_from_mat(zip_path, mat_paths, out, # ** If zip_path is None, ma
                 ecg_all.append(ecg_and_ppg[0])
                 ppg_all.append(ecg_and_ppg[1])
                 if labels is not None:
-                    n_win = ecg_raw.shape[0]
+                    n_win = len(ecg_and_ppg[0])
                     y_all.append(np.full(n_win, labels[idx], dtype=np.float32))
         except Exception as e:
             print("skip:", os.path.basename(mat_path), e)
@@ -160,6 +160,8 @@ def build_splits_from_mat(zip_path, mat_paths, out, # ** If zip_path is None, ma
     y_arr = None
     if y_all is not None:
         y_arr = np.concatenate(y_all)   # length == n_windows total
+        print(ecg_all.shape)
+        print(y_arr.shape, y_arr)
     _save_splits(out, f'{int(win_sec)}sec',
                  ecg_all, ppg_all, train_ratio, seed, labels=y_arr)
 

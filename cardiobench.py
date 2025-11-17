@@ -1,7 +1,6 @@
 from std_eval import eval_diffusion
 from zipfile import ZipFile
 import os
-
 import torch
 torch.autograd.set_detect_anomaly(True)
 import random
@@ -11,20 +10,14 @@ from metrics import *
 warnings.filterwarnings("ignore")
 import numpy as np
 from diffusion import load_pretrained_DPM
-import matplotlib.pyplot as plt
 import torch.nn.functional as F
 from data import get_datasets
-import torch.nn as nn
-from torch.utils.data import Dataset, DataLoader
 from config import WEIGHTS_DIR, DATA_ROOT, DATASETS
-
-import os
-import numpy as np
-import torch
 import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader
 from scipy.signal import stft
 from torchvision.models import vgg13
+from sklearn.metrics import f1_score
 
 def prep_afib_dataset(window, EVAL_DATASETS, nT=10, batch_size=512, PATH=WEIGHTS_DIR, save_path=DATA_ROOT, device="cuda"):
 
@@ -95,9 +88,6 @@ def prep_afib_dataset(window, EVAL_DATASETS, nT=10, batch_size=512, PATH=WEIGHTS
             np.save(os.path.join(save_path, f"afib_{'test' if idx else 'train'}_real_ppgs_{window}sec.npy"),  real_ppgs[1:])
             np.save(os.path.join(save_path, f"afib_{'test' if idx else 'train'}_labels_{window}sec.npy"),  labels[1:])
 
-from sklearn.metrics import f1_score  # if you prefer not to depend on sklearn, we can do it manually
-# or we can compute F1 manually below; I'll do manual F1 to avoid extra deps.
-
 def eval_afib(
     datasets,
     PATH=DATA_ROOT,
@@ -143,7 +133,7 @@ def eval_afib(
     criterion = nn.BCEWithLogitsLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
 
-    # ---- accuracy + F1 for a loader ----
+    # Accuracy + F1 function
     def eval_loader(loader):
         model.eval()
         correct, total = 0, 0
@@ -162,23 +152,20 @@ def eval_afib(
                 all_preds.append(preds.cpu())
                 all_targets.append(y.cpu())
 
-        acc = correct / total if total > 0 else 0.0
-        if total > 0:
-            all_preds    = torch.cat(all_preds).numpy()
-            all_targets  = torch.cat(all_targets).numpy()
-            # manual F1 (binary)
-            tp = ((all_preds == 1) & (all_targets == 1)).sum()
-            fp = ((all_preds == 1) & (all_targets == 0)).sum()
-            fn = ((all_preds == 0) & (all_targets == 1)).sum()
-            prec = tp / (tp + fp) if (tp + fp) > 0 else 0.0
-            rec  = tp / (tp + fn) if (tp + fn) > 0 else 0.0
-            f1   = 2 * prec * rec / (prec + rec) if (prec + rec) > 0 else 0.0
-        else:
-            f1 = 0.0
+        if total == 0:
+            return 0.0, 0.0
+
+        all_preds   = torch.cat(all_preds).numpy()
+        all_targets = torch.cat(all_targets).numpy()
+
+        acc = correct / total
+        # ensure 0/1 integers for sklearn
+        f1  = f1_score(all_targets.astype(int), all_preds.astype(int), average="binary")
+
         return acc, f1
     # ------------------------------------
 
-    # train loop
+    # Train loop
     for epoch in range(epochs):
         model.train()
         running_loss = 0.0
