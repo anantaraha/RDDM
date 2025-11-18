@@ -171,7 +171,15 @@ if __name__ == "__main__":
     if len(sys.argv) > 1: # Argument supplied
         cmd = sys.argv[1].lower()
         if cmd == 'ddpm':
-            train_ddpm(DDPM_TRAIN_CONFIG)
+            train_config = DDPM_TRAIN_CONFIG
+            # Check if nT supplied
+            if len(sys.argv) > 2:   # Check for second argument (nT)
+                try:
+                    nT = int(sys.argv[2])
+                    train_config['nT'] = nT
+                except ValueError:
+                    raise Exception('Error!! supplied nT is not a valid integer. Skipping training...')
+            train_ddpm(train_config)
         elif cmd == 'rddm':
             train_rddm(RDDM_TRAIN_CONFIG)
         else:
