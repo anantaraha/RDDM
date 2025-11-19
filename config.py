@@ -1,7 +1,7 @@
 DATA_ROOT = '../datasets/'                                      # root dir for datasets
 WEIGHTS_DIR = '../weights/'                                     # root dir for weights
 DATASETS = ['WESAD', 'CAPNO', 'DALIA', 'BIDMC', 'MIMIC-AFib']   # list of dataset dirnames
-SAVE_AFTER_EPOCHS = 8                                           # save weights every ? epochs (80 previously)
+SAVE_AFTER_EPOCHS = 4                                           # save weights every ? epochs (80 previously)
 
 RDDM_TRAIN_CONFIG = {
     "n_epoch": 5,           #1000, -> Total epochs to train
