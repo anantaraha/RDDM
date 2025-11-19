@@ -12,7 +12,7 @@ import torch.nn.functional as F
 from data import get_datasets
 import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader
-from config import WEIGHTS_DIR
+from config import WEIGHTS_DIR, DDPM_TRAIN_CONFIG
 
 def set_deterministic(seed):
     # seed by default is None 
@@ -44,6 +44,7 @@ def pad_along_axis(array: np.ndarray, target_length: int, axis: int = 0) -> np.n
 
     return np.pad(array, pad_width=npad, mode='constant', constant_values=0)
 
+'''
 def eval_diffusion(window, EVAL_DATASETS, nT=10, batch_size=512, PATH=WEIGHTS_DIR, device="cuda"):
 
     _, dataset_test = get_datasets(datasets=EVAL_DATASETS, window=window)
@@ -118,18 +119,129 @@ def eval_diffusion(window, EVAL_DATASETS, nT=10, batch_size=512, PATH=WEIGHTS_DI
         }
 
         return tracked_metrics
+'''
 
-if __name__ == "__main__":
+def eval_diffusion(window, EVAL_DATASETS, model_type='RDDM', nT=10, batch_size=512, PATH=WEIGHTS_DIR, device="cuda"):
 
+    _, dataset_test = get_datasets(datasets=EVAL_DATASETS, window=window)
+
+    testloader = DataLoader(dataset_test, batch_size=batch_size, shuffle=True, num_workers=64)
+
+    dpm, Conditioning_network1, Conditioning_network2 = load_pretrained_DPM(
+        PATH=PATH,
+        nT=nT,
+        type=model_type,    # DDPM will return None for network 2.
+        device="cuda"
+    )
+    
+    dpm = nn.DataParallel(dpm)
+    Conditioning_network1 = nn.DataParallel(Conditioning_network1)
+    if Conditioning_network2 is not None:
+        Conditioning_network2 = nn.DataParallel(Conditioning_network2)
+
+    dpm.eval()
+    Conditioning_network1.eval()
+    if Conditioning_network2 is not None:
+        Conditioning_network2.eval()
+
+    with torch.no_grad():
+
+        fd_list = []
+        fake_ecgs = np.zeros((1, 128*window))
+        real_ecgs = np.zeros((1, 128*window))
+        real_ppgs = np.zeros((1, 128*window))
+        true_rois = np.zeros((1, 128*window))
+
+        for y_ecg, x_ppg, ecg_roi in tqdm(testloader):
+
+            x_ppg = x_ppg.float().to(device)
+            y_ecg = y_ecg.float().to(device)
+            ecg_roi = ecg_roi.float().to(device)
+
+            generated_windows = []
+
+            for ppg_window in torch.split(x_ppg, 128*4, dim=-1):
+                
+                if ppg_window.shape[-1] != 128*4:
+                    
+                    ppg_window = F.pad(ppg_window, (0, 128*4 - ppg_window.shape[-1]), "constant", 0)
+
+                ppg_conditions1 = Conditioning_network1(ppg_window)
+                ppg_conditions2 = None
+                if Conditioning_network2 is not None:
+                    ppg_conditions2 = Conditioning_network2(ppg_window)
+
+                if ppg_conditions2 is not None:
+                    xh = dpm(
+                        cond1=ppg_conditions1, 
+                        cond2=ppg_conditions2, 
+                        mode="sample", 
+                        window_size=128*4
+                    )
+                else:
+                    xh = dpm(
+                        cond=ppg_conditions1, 
+                        mode="sample", 
+                        window_size=128*4
+                    )
+                
+                generated_windows.append(xh.cpu().numpy())
+
+            xh = np.concatenate(generated_windows, axis=-1)[:, :, :128*window]
+
+            fd = calculate_FD(y_ecg, torch.from_numpy(xh).to(device))
+
+            fake_ecgs = np.concatenate((fake_ecgs, xh.reshape(-1, 128*window)))
+            real_ecgs = np.concatenate((real_ecgs, y_ecg.reshape(-1, 128*window).cpu().numpy()))
+            real_ppgs = np.concatenate((real_ppgs, x_ppg.reshape(-1, 128*window).cpu().numpy()))
+            true_rois = np.concatenate((true_rois, ecg_roi.reshape(-1, 128*window).cpu().numpy()))
+            fd_list.append(fd)
+
+        mae_hr_ecg, rmse_score = evaluation_pipeline(real_ecgs[1:], fake_ecgs[1:])
+
+        tracked_metrics = {
+            "RMSE_score": rmse_score,
+            "MAE_HR_ECG": mae_hr_ecg,
+            "FD": sum(fd_list) / len(fd_list),
+        }
+
+        return tracked_metrics
+
+def run_table2_exp(model_type, nT=10):
     # TABLE 2 results
-    print("\n******* Standard evaluation (Table 2) results *******")
+    print(f"\n******* Standard evaluation (Table 2, {model_type}) results *******")
     for dataset_name in ["WESAD", "CAPNO", "DALIA", "BIDMC", "MIMIC-AFib"]:
         
         tracked_metrics = eval_diffusion(
             window=4,
+            model_type=model_type,
             EVAL_DATASETS=[dataset_name],
-            nT=10,
+            nT=nT,
         )
         print(f"\n{dataset_name}: RMSE is {tracked_metrics['RMSE_score']}, FD is {tracked_metrics['FD']}")
         print("-"*1000)
+
+if __name__ == "__main__":
+
+    if len(sys.argv) > 1: # Argument supplied
+        cmd = sys.argv[1].lower()
+        if cmd == 'ddpm':
+            nT = DDPM_TRAIN_CONFIG['nT']    # Default
+            # Check if nT supplied
+            if len(sys.argv) > 2:   # Check for second argument (nT)
+                try:
+                    nT = int(sys.argv[2])
+                except ValueError:
+                    raise Exception('Error!! supplied nT is not a valid integer. Skipping training...')
+            run_table2_exp(model_type='DDPM', nT=nT)
+        elif cmd == 'rddm':
+            run_table2_exp(model_type='RDDM', nT=10)
+        else:
+            print('Unrecognized command!! No operation.')
+    else:   # By default, train both
+        run_table2_exp(model_type='DDPM', nT=10)
+        run_table2_exp(model_type='RDDM', nT=10)
+
+
+    
 

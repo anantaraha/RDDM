@@ -22,7 +22,7 @@ from std_eval import set_deterministic
 
 set_deterministic(31)
 
-def prep_afib_dataset(dataset_name, window, nT=10, batch_size=512, PATH=WEIGHTS_DIR, device="cuda"):
+def prep_afib_dataset(dataset_name, window, model_type, nT=10, batch_size=512, PATH=WEIGHTS_DIR, device="cuda"):
 
     dataset_train, dataset_test = get_datasets(mode='ecg+labels', datasets=[dataset_name,], window=window)   ###
 
@@ -32,17 +32,19 @@ def prep_afib_dataset(dataset_name, window, nT=10, batch_size=512, PATH=WEIGHTS_
     dpm, Conditioning_network1, Conditioning_network2 = load_pretrained_DPM(
         PATH=PATH,
         nT=nT,
-        type="RDDM",
+        type=model_type,    # if DDPM supplied, Conditioning_network2 is returned None
         device="cuda"
     )
     
     dpm = nn.DataParallel(dpm)
     Conditioning_network1 = nn.DataParallel(Conditioning_network1)
-    Conditioning_network2 = nn.DataParallel(Conditioning_network2)
+    if Conditioning_network2 is not None:
+        Conditioning_network2 = nn.DataParallel(Conditioning_network2)
 
     dpm.eval()
     Conditioning_network1.eval()
-    Conditioning_network2.eval()
+    if Conditioning_network2 is not None:
+        Conditioning_network2.eval()
 
     with torch.no_grad():
 
@@ -67,14 +69,23 @@ def prep_afib_dataset(dataset_name, window, nT=10, batch_size=512, PATH=WEIGHTS_
                         ppg_window = F.pad(ppg_window, (0, 128*4 - ppg_window.shape[-1]), "constant", 0)
 
                     ppg_conditions1 = Conditioning_network1(ppg_window)
-                    ppg_conditions2 = Conditioning_network2(ppg_window)
-
-                    xh = dpm(
-                        cond1=ppg_conditions1, 
-                        cond2=ppg_conditions2, 
-                        mode="sample", 
-                        window_size=128*4
-                    )
+                    ppg_conditions2 = None
+                    if Conditioning_network2 is not None:
+                        ppg_conditions2 = Conditioning_network2(ppg_window)
+                    
+                    if ppg_conditions2 is not None:
+                        xh = dpm(
+                            cond1=ppg_conditions1, 
+                            cond2=ppg_conditions2, 
+                            mode="sample", 
+                            window_size=128*4
+                        )
+                    else:
+                        xh = dpm(
+                            cond=ppg_conditions1, 
+                            mode="sample", 
+                            window_size=128*4
+                        )
                     
                     generated_windows.append(xh.cpu().numpy())
 
@@ -176,27 +187,27 @@ def eval_afib(
     return metrics, model
 
 
-
-
-if __name__ == "__main__":
+def run_table3_exp(model_type, nT=10):
     # TABLE 3 results
-    print("\n******* Heart Rate estimation (Table 3) results *******")
+    print(f"\n******* Heart Rate estimation (Table 3, {model_type}) results *******")
     for dataset_name in ["WESAD", "DALIA"]:
         
         tracked_metrics = eval_diffusion(
             window=8,
             EVAL_DATASETS=[dataset_name],
-            nT=10,
+            model_type=model_type,
+            nT=nT,
         )
         print(f"\n{dataset_name}: Mean Absolute Error (BPM) is {tracked_metrics['MAE_HR_ECG']}")
         print("-"*1000)
 
+def run_table4_exp(model_type, nT=10):
     # TABLE 4 results: AFib detection
-    print("\n******* Atrial Fibrillation Detection (Table 4) results *******")
+    print(f"\n******* Atrial Fibrillation Detection (Table 4, {model_type}) results *******")
     for dataset_name in ['MIMIC-AFib',]:    # We can add more datasets later, each for afib detection.
 
         # Prepare AFib dataset for every dataset (for VGG13, training + evaluation)
-        prep_afib_dataset(dataset_name, window=4, nT=10, batch_size=512, device="cuda")
+        prep_afib_dataset(dataset_name, window=4, model_type=model_type, nT=nT, batch_size=512, device="cuda")
             
         tracked_metrics, _ = eval_afib(EVAL_DATASETS=[dataset_name,],
                                     window=4,
@@ -208,4 +219,31 @@ if __name__ == "__main__":
         print(f"{dataset_name} (Real PPG): Accuracy={tracked_metrics['acc_real_ppg']}, F1={tracked_metrics['f1_real_ppg']}")
         print(f"{dataset_name} (Fake ECG): Accuracy={tracked_metrics['acc_fake_ecg']}, F1={tracked_metrics['f1_fake_ecg']}")
         print("-"*1000)
+
+if __name__ == "__main__":
+    nT = 10
+    model_type = 'RDDM'
+    if len(sys.argv) > 1: # Argument supplied
+        cmd = sys.argv[1].lower()
+        if cmd == 'ddpm':
+            model_type = 'DDPM'
+            # Check if nT supplied
+            if len(sys.argv) > 2:   # Check for second argument (nT)
+                try:
+                    nT = int(sys.argv[2])
+                except ValueError:
+                    raise Exception('Error!! supplied nT is not a valid integer. Skipping training...')
+        elif cmd == 'rddm':
+            pass
+        run_table3_exp(model_type=model_type, nT=nT)
+        run_table4_exp(model_type=model_type, nT=nT)
+    else:   # By default, train both
+        run_table3_exp(model_type='DDPM', nT=nT)
+        run_table3_exp(model_type='RDDM', nT=nT)
+        run_table4_exp(model_type='DDPM', nT=nT)
+        run_table4_exp(model_type='RDDM', nT=nT)
+
+    
+
+    
 
