@@ -44,3 +44,61 @@ If you find this repository useful, please consider giving a star :star: and cit
 ### Acknowledgments
 This work was supported by Mitacs, Vector Institute, and
 Ingenuity Labs Research Institute.
+
+# How to Run Code?
+
+### Data Preparation
+1. Download repository: 
+    ```
+    git clone https://github.com/anantaraha/RDDM.git
+    ```
+1. Download five datasets to `RDDM/` directory *(see `rddm_demo.ipynb` notebook for links and code)*
+1. Run following terminal command once. This will save appropriate files (4s/8s window, 128 Hz converted) necessary files are saved into `../datasets/{dataset_name}/` for every dataset 
+    ```
+    python preprocessing.py
+    ```
+
+
+### Train Models
+
+All default training-related hyperparameters (and variables) are set in `config.py`. Modify them if necessary, and save.
+
+***To train DDPM model:***
+- Run command from terminal: 
+    ```
+    python train.py ddpm 10     // 10 diffusion steps. Unless specified, default nT from config.py is used
+    ```
+- After completed, rename the best saved weights to: `ddpm_main_network_{nT}.pth` for main network, and `ddpm_condition_encoder_{nT}.pth` for condition. For example, `ddpm_main_network_25.pth` for nT=25.
+
+***To train RDDM model:***
+- Run command from terminal: 
+    ```
+    python train.py rddm
+    ```
+- When completed, rename the best saved weights to: `rddm_main_network.pth` for main network; `rddm_condition_encoder_1.pth` and `rddm_condition_encoder_2.pth` for first, second condition networks, respectively.
+
+### Standard Evaluation
+***For DDPM:***
+- Separately run commands from terminal: 
+    ```
+    python std_eval.py ddpm 10  // uses weights trained with T = 10
+    python std_eval.py ddpm 25  // uses weights trained with T = 25
+    python std_eval.py ddpm 50  // uses weights trained with T = 50
+    ```
+***For RDDM:***
+- Run command from terminal:
+    ```
+    python std_eval.py rddm
+    ```
+
+### Cardiobench Evaluatoin
+***For DDPM:***
+- Separately run commands from terminal: 
+    ```
+    python cardiobench.py ddpm 50   // uses weights trained with T = 50
+    ```
+***For RDDM:***
+- Run command from terminal:
+    ```
+    python cardiobench.py rddm
+    ```
