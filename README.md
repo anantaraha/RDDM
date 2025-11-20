@@ -19,7 +19,7 @@ Ali Etemad
 - [x] RDDM algorithm
 - [x] Training code
 - [x] Pretrained diffusion weights (https://drive.google.com/drive/folders/1Z7JQ5VdTrekx4lbARJNIUiR5D-4Kz7wg?usp=sharing)
-- [ ] CardioBench
+- [ ] CardioBench *(Implemented: Heart Rate and Atrial Fibrillation Detection)*
 - [x] Evaluation code
 
 #### ** You may follow this repo to receive future updates. **
